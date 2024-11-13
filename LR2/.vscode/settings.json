@@ -1,0 +1,11 @@
+{
+    "files.associations": {
+        "iostream": "cpp",
+        "new": "cpp",
+        "cmath": "cpp",
+        "complex": "cpp",
+        "iomanip": "cpp",
+        "chrono": "cpp",
+        "dense": "cpp"
+    }
+}
