@@ -89,43 +89,38 @@ MatrixXd createZeroMatrix(int n){
     return matrix;
 }
 
+double error(const MatrixXd& A,const MatrixXd& B){
+    return (A-B).cwiseAbs().sum();
+}
+
 int main() {
-    int n = 10;
-    // Создание двумерной матрицы для ввода данных с использованием Eigen
-    MatrixXd A = createRandomSimetricMatrix(n);
-    A = A * A.transpose();
-    printMatrix(A, n);
+    for(int n = 10; n<1001; n*=10 ){
+        cout<< "n = " << n << endl;
+        MatrixXd A = createRandomSimetricMatrix(n);
+        A = A * A.transpose();
+        
+        MatrixXd L_jki = MatrixXd::Zero(n, n);
+        MatrixXd L_jik = MatrixXd::Zero(n, n);
 
-    // Создание матрицы для результата разложения
-    MatrixXd L_jki = MatrixXd::Zero(n, n);
-    MatrixXd L_jik = MatrixXd::Zero(n, n);
+        auto start_jki = std::chrono::high_resolution_clock::now();
+        cholesky_jki(A, L_jki, n);
+        auto end_jki = std::chrono::high_resolution_clock::now();
+        chrono::duration<double, std::milli> duration_jki = end_jki - start_jki;
 
-    auto start_jki = std::chrono::high_resolution_clock::now();
-    cholesky_jki(A, L_jki, n);
-    auto end_jki = std::chrono::high_resolution_clock::now();
-    chrono::duration<double, std::milli> duration_jki = end_jki - start_jki;
-
-    auto start_jik = std::chrono::high_resolution_clock::now();
-    cholesky_jik(A, L_jik, n);
-    auto end_jik = std::chrono::high_resolution_clock::now();
-    chrono::duration<double, std::milli> duration_jik = end_jik - start_jik;
+        auto start_jik = std::chrono::high_resolution_clock::now();
+        cholesky_jik(A, L_jik, n);
+        auto end_jik = std::chrono::high_resolution_clock::now();
+        chrono::duration<double, std::milli> duration_jik = end_jik - start_jik;
 
 
-    cout << "Lead time: " << duration_jki.count() << " ms" << std::endl;
-    cout << "JKI: Result of Cholesky decomposition (matrix L):" << endl;
-    printMatrix(L_jki, n);
-    cout << endl << "Check (multiplying the result by the transposed matrix):" << endl;
-    MatrixXd result_jki = L_jki*L_jki.transpose();
-    printMatrix(result_jki, n);
-
-
-    
-    cout << endl << "Lead time: " << duration_jik.count() << " ms" << std::endl;
-    cout << "JIK: Result of Cholesky decomposition (matrix L):" << endl;
-    printMatrix(L_jik, n);
-    cout << endl << "Check (multiplying the result by the transposed matrix):" << endl;
-    MatrixXd result_jik = L_jik*L_jik.transpose();
-    printMatrix(result_jik, n);
+        cout << "Lead time JKI: " << duration_jki.count() << " ms" << std::endl;
+        MatrixXd result_jki = L_jki*L_jki.transpose();
+        cout  << "Check JKI (multiplying the result by the transposed matrix):" << error(A,result_jki)<< endl;
+        
+        cout << "Lead time JIK: " << duration_jik.count() << " ms" << std::endl;
+        MatrixXd result_jik = L_jik*L_jik.transpose();
+        cout  << "Check JIK (multiplying the result by the transposed matrix):" << error(A,result_jik)<< endl<<endl;
+    }
 
     return 0;
 }
