@@ -3,6 +3,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <math.h>
+#include <chrono> 
 
 using namespace std;
 
@@ -133,7 +134,7 @@ int main(void)
 {
     double* pog = new double[10];
     
-    for(int nn = 5, t = 0; nn<6; nn*=10, t++){
+    for(int nn = 10, t = 0; nn<1001; nn*=10, t++){
     const int n = nn;   
     
     // double** matrix = createRandomSimetricMatrix(n);
@@ -161,12 +162,19 @@ int main(void)
     double** LCopy = copyMatrix(L, n);
 
     //cout  << endl << "Cholesky Matrix JIK (" << n << "x" << n << "):" << endl;
-    chileskyDecompositionJIK(B,L,n);
+    auto start_jki = std::chrono::high_resolution_clock::now();
+    choleskyDecompositionJKI(B,L,n);
+    auto end_jki = std::chrono::high_resolution_clock::now();
+    chrono::duration<double, std::milli> duration_jki = end_jki - start_jki;
+    
     //printMatrix(L, n);
 
-
+    auto start_jik = std::chrono::high_resolution_clock::now();
+    chileskyDecompositionJIK(B,LCopy,n);
+    auto end_jik = std::chrono::high_resolution_clock::now();
+    chrono::duration<double, std::milli> duration_jik = end_jik - start_jik;
     //cout  << endl << "Cholesky Matrix JKI (" << n << "x" << n << "):" << endl;
-    choleskyDecompositionJKI(B,LCopy,n);
+    
     //printMatrix(LCopy, n);
 
 
@@ -183,9 +191,9 @@ int main(void)
             dd += abs(resT[i][j] - B[i][j]);
         }
     }
-        cout<<"nn iter = "<<nn<<endl;
-        pog[t] = dd;
-        for (int i = 0; i < n; i++) {
+    cout<<"n = "<<nn<< ", time JIK: " << duration_jik.count() << " ms, time JKI:"  << duration_jki.count() << " ms" << std::endl;
+    pog[t] = dd;
+    for (int i = 0; i < n; i++) {
             delete[] A[i];
             delete[] LCopy[i];
             delete[] L[i];
@@ -203,7 +211,7 @@ int main(void)
     }
     
 
-    cout<<"discrepancy:";
+    cout<<"error:";
     for(int i = 0; i<3; i++){
         cout<<pog[i]<<' ';
     }

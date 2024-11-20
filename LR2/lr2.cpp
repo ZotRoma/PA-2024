@@ -3,124 +3,217 @@
 #include <cstdlib>
 #include <ctime>
 #include <math.h>
-#include <Eigen/Dense> 
-#include <iomanip> 
 #include <chrono> 
 
-using namespace Eigen;
 using namespace std;
 
-
-// Операция GAXPY для обновления суммы
-double gaxpy(const VectorXd& L_j, const VectorXd& L_k, int count) {
-    return L_j.head(count).dot(L_k.head(count));  // Скалярное произведение (векторизация)
-}
-
-// Функция разложения Холецкого в порядке JKI с использованием GAXPY
-void cholesky_jki(MatrixXd& A, MatrixXd& L, int n) {
-    for (int j = 0; j < n; ++j) {
-        for (int k = 0; k <= j; ++k) {
-            double sum = gaxpy(L.row(j), L.row(k), k);  // Векторизированный GAXPY для суммы произведений
-
-            if (j == k) {
-                L(j, k) = sqrt(A(j, j) - sum);
-            } else {
-                L(j, k) = (A(j, k) - sum) / L(k, k);
-            }
-        }
-    }
-}
-
-
-void cholesky_jik(MatrixXd& A, MatrixXd& L, int n)
-{
-    for (int j = 0; j < n; ++j)
-    {
-        Eigen::VectorXd s;
-        if (j > 0)
-        {
-            // s = A[j:n-1, j] - L[j:n-1, 0:j-1] * L[j, 0:j-1].transpose()
-            s = A.block(j, j, n - j, 1);
-            s.noalias() -= L.block(j, 0, n - j, j) * L.row(j).head(j).transpose();
-        }
-        else
-        {
-            // s = A[j:n-1, j]
-            s = A.block(j, j, n - j, 1);
-        }
-        L(j, j) = sqrt(s(0));
-        if (n - j - 1 > 0)
-        {
-            L.block(j + 1, j, n - j - 1, 1) = s.segment(1, n - j - 1) / L(j, j);
-        }
-    }
-}
-
-void printMatrix(const MatrixXd& M, int n) {
-    for (int i = 0; i < n; ++i) {
-        for (int j = 0; j < n; ++j) {
-            cout << setw(10) << M(i, j) << " ";
+void printMatrix(double** matrix, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j < n; j++) {
+            cout << matrix[i][j] << " ";
         }
         cout << endl;
     }
 }
 
-MatrixXd createRandomSimetricMatrix(int n){
-    MatrixXd matrix(n,n);
+double** createRandomSimetricMatrix(int n){
+    double** matrix = new double*[n];
+    for(int i = 0; i<n; i++){
+        matrix[i] = new double[n];
+    }
     srand(time(0));
 
     for (int i = 0; i < n; i++) {
         for (int j = i; j < n; j++) {
             int value = rand() % 10;
-            matrix(i,j) = value;
-            matrix(j,i) = value;
+            matrix[i][j] = value;
+            matrix[j][i] = value;
         }
     }
     return matrix;
 }
-MatrixXd createZeroMatrix(int n){
-    MatrixXd matrix(n,n);
+double** createZeroMatrix(int n){
+    double** matrix = new double*[n];
+    for(int i = 0; i<n; i++){
+        matrix[i] = new double[n];
+    }
     for (int i = 0; i < n; i++) {
         for (int j = i; j < n; j++) {
-            matrix(i,j) = 0;
-            matrix(j,i) = 0;
+            matrix[i][j] = 0;
+            matrix[j][i] = 0;
+        }
+    }
+    return matrix;
+}
+double** copyMatrix(double** m, int n){
+    double** matrix = new double*[n];
+    for(int i = 0; i<n; i++){
+        matrix[i] = new double[n];
+    }
+    for (int i = 0; i < n; i++) {
+        for (int j = i; j < n; j++) {
+            matrix[i][j] = m[i][j];
+            matrix[j][i] = m[j][i];
         }
     }
     return matrix;
 }
 
-double error(const MatrixXd& A,const MatrixXd& B){
-    return (A-B).cwiseAbs().sum();
+
+void multiplyTranspose(double** B, double** A, int n) {
+    for (int i = 0; i < n; i++) {
+        for (int j = 0; j <= i; j++) {
+            A[i][j] = 0;
+            for (int k = 0; k < n; k++) {
+                A[i][j] += B[i][k] * B[j][k];
+            }
+            A[j][i] = A[i][j];  // Заполняем симметрично
+        }
+    }
 }
 
-int main() {
-    for(int n = 10; n<1001; n*=10 ){
-        cout<< "n = " << n << endl;
-        MatrixXd A = createRandomSimetricMatrix(n);
-        A = A * A.transpose();
-        
-        MatrixXd L_jki = MatrixXd::Zero(n, n);
-        MatrixXd L_jik = MatrixXd::Zero(n, n);
+void chileskyDecompositionJIK(double** A, double** L, int n){
+    for (int j = 0; j < n; j++) {
+        double sum = 0.0;
+        for (int k = 0; k < j; k++) {
+            sum += L[j][k] * L[j][k];
+        }
+        L[j][j] = sqrt(A[j][j] - sum);
 
-        auto start_jki = std::chrono::high_resolution_clock::now();
-        cholesky_jki(A, L_jki, n);
-        auto end_jki = std::chrono::high_resolution_clock::now();
-        chrono::duration<double, std::milli> duration_jki = end_jki - start_jki;
-
-        auto start_jik = std::chrono::high_resolution_clock::now();
-        cholesky_jik(A, L_jik, n);
-        auto end_jik = std::chrono::high_resolution_clock::now();
-        chrono::duration<double, std::milli> duration_jik = end_jik - start_jik;
-
-
-        cout << "Lead time JKI: " << duration_jki.count() << " ms" << std::endl;
-        MatrixXd result_jki = L_jki*L_jki.transpose();
-        cout  << "Check JKI (multiplying the result by the transposed matrix):" << error(A,result_jki)<< endl;
-        
-        cout << "Lead time JIK: " << duration_jik.count() << " ms" << std::endl;
-        MatrixXd result_jik = L_jik*L_jik.transpose();
-        cout  << "Check JIK (multiplying the result by the transposed matrix):" << error(A,result_jik)<< endl<<endl;
+        for (int i = j + 1; i < n; i++) {
+            sum = 0.0;
+            for (int k = 0; k < j; k++) {
+                sum += L[i][k] * L[j][k];
+            }
+            L[i][j] = (A[i][j] - sum) / L[j][j];
+        }
     }
+    for(int i = 0; i <n; i++){
+        for(int j = i+1; j<n; j++){
+            L[i][j] = 0;
+        }
+    }
+}
 
+void choleskyDecompositionJKI(double** A, double** L, int n){
+    // for(int j = 0; j<n; j++){
+    //     for(int k = 0; k<j; k++){
+    //         for(int i = j; i<n; i++){
+                
+    //             L[i][j] = L[i][j]-L[i][k]*L[j][k];
+    //         }
+    //     }
+    //     for(int i = j; i<n; i++){
+    //         L[i][j] = L[i][j]/sqrt(L[j][j]);
+    //     }
+    //     cout<<endl;
+    //     printMatrix(L, n);
+    // }
+    for (int J = 0; J < n; J++) {
+        for (int k = 0; k <= J; k++) {
+            double sum = 0;
+            for (int i = 0; i < k; i++) {
+                sum += L[J][i] * L[k][i];
+            }
+            if (J == k) {
+                L[J][k] = sqrt(A[J][J] - sum);
+            } else {
+                L[J][k] = (A[J][k] - sum) / L[k][k];
+            }
+        }
+    }
+    for(int i = 0; i <n; i++){
+        for(int j = i+1; j<n; j++){
+            L[i][j] = 0;
+        }
+    }
+    
+}
+
+int main(void)
+{
+    double* pog = new double[10];
+    
+    for(int nn = 10, t = 0; nn<1001; nn*=10, t++){
+    const int n = nn;   
+    
+    // double** matrix = createRandomSimetricMatrix(n);
+    
+    
+    // cout << "Symmetric Matrix (" << n << "x" << n << "):" << endl;
+    // printMatrix(matrix, n);
+    // cout << "Copy Matrix (" << n << "x" << n << "):" << endl;
+    // printMatrix(L, n);
+    // cout << "Cholesky Matrix (" << n << "x" << n << "):" << endl;
+    // choleskyDecompositionJKI(matrix,L,n);
+    // printMatrix(L, n);
+
+    double** A = createRandomSimetricMatrix(n);
+    //printMatrix(A, n);
+    //cout<<endl;
+    double** B = createZeroMatrix(n);
+    //printMatrix(B, n);
+   // cout<<endl;
+    multiplyTranspose(A,B,n);
+    //printMatrix(B, n);
+    //cout<<endl;
+    double** L = copyMatrix(B, n);
+    
+    double** LCopy = copyMatrix(L, n);
+
+    //cout  << endl << "Cholesky Matrix JIK (" << n << "x" << n << "):" << endl;
+    auto start_jki = std::chrono::high_resolution_clock::now();
+    choleskyDecompositionJKI(B,L,n);
+    auto end_jki = std::chrono::high_resolution_clock::now();
+    chrono::duration<double, std::milli> duration_jki = end_jki - start_jki;
+    
+    //printMatrix(L, n);
+
+    auto start_jik = std::chrono::high_resolution_clock::now();
+    chileskyDecompositionJIK(B,LCopy,n);
+    auto end_jik = std::chrono::high_resolution_clock::now();
+    chrono::duration<double, std::milli> duration_jik = end_jik - start_jik;
+    //cout  << endl << "Cholesky Matrix JKI (" << n << "x" << n << "):" << endl;
+    
+    //printMatrix(LCopy, n);
+
+
+    double** res = copyMatrix(LCopy, n);
+    double** resT = createZeroMatrix(n);
+   // cout  << endl << "matrix for checker" << endl;
+    multiplyTranspose(res,resT,n);
+    cout<<endl;
+    //printMatrix(resT, n);
+
+    double dd = 0;
+    for(int i = 0; i < n; i++){
+        for(int j = 0; j < n; j++){
+            dd += abs(resT[i][j] - B[i][j]);
+        }
+    }
+    cout<<"n = "<<nn<< ", time JIK: " << duration_jik.count() << " ms, time JKI:"  << duration_jki.count() << " ms" << std::endl;
+    pog[t] = dd;
+    for (int i = 0; i < n; i++) {
+            delete[] A[i];
+            delete[] LCopy[i];
+            delete[] L[i];
+            delete[] B[i];
+            delete[] res[i];
+            delete[] resT[i];
+
+        }
+        delete[] A;
+        delete[] L;
+        delete[] LCopy;
+        delete[] B;
+        delete[] res;
+        delete[] resT;
+    }
+    
+
+    cout<<"error:";
+    for(int i = 0; i<3; i++){
+        cout<<pog[i]<<' ';
+    }
     return 0;
 }
